@@ -5,10 +5,14 @@ const cors = require("cors");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 const argon2 = require("argon2");
+const { authenticator } = require("otplib");
+const QRCode = require("qrcode");
 require("dotenv").config();
+//reqire("cookie-parser");
 
 //CORS configuration to allow http requests from the listed domains
 //would need to be changes and expanded along with the server to make a "live" version
+
 userRoutes.use((req, res, next) => {
 	res.header("Origin", "http://localhost:3000");
 	res.header("Access-Control-Allow-Origin", "http://localhost:3000");
@@ -16,6 +20,7 @@ userRoutes.use((req, res, next) => {
 		"Access-Control-Allow-Headers",
 		"Origin, X-Requested-With, Content-Type, Accept, Authorization"
 	);
+	res.header("Access-Control-Allow-Credentials", "true");
 	next();
 });
 
@@ -38,16 +43,31 @@ userRoutes.post("/api/signUp", async (req, res) => {
 	const password = await bcrypt.hash(req.body.password, 10);
 	const email = req.body.email;
 	let counter = 0;
-
+	const secret = authenticator.generateSecret();
 	try {
 		let response = await User.create({
 			username,
 			email,
 			password,
 			counter,
+			secret,
 		});
-		res.status(200);
-		res.json({ message: "User has been sucessfully created." });
+		QRCode.toDataURL(authenticator.keyuri(email, "FullStackDev", secret), (err, url) => {
+			if (err) {
+				console.log("Error Name: " + err.name + "; Error Message: " + err.message);
+				res.status(298);
+				res.json({
+					message: "Something went wrong when generating a QR code for 2fa.",
+					errName: err.name,
+					errcode: err.code,
+					message: err.message,
+					error: true,
+				});
+			} else {
+				res.status(200);
+				res.json({ qr: url, message: "User has been sucessfully created." });
+			}
+		});
 	} catch (error) {
 		//need to handle more broadly
 		console.log(error.message);
@@ -83,10 +103,10 @@ userRoutes.post("/api/login", async (req, res) => {
 					process.env.JWT_SECRET
 				);
 				res.status(200);
-				console.log(JSON.stringify(user));
+				//for additional security
+				res.cookie("token", "Bearer " + token, { httpOnly: true });
 				return res.json({
 					message: "login and JWT generation was sucessful.",
-					token: "Bearer: " + token,
 					user: { count: user.counter, username: user.username, email: user.email },
 				});
 			}
@@ -109,10 +129,10 @@ userRoutes.post("/api/login", async (req, res) => {
 });
 
 function verifyJWT(req, res, next) {
-	const bearerToken = req.headers["authorization"];
+	const bearerToken = req.cookies.token;
 	if (bearerToken) {
 		//remove 'bearer: ' schema
-		let token = bearerToken.slice(8);
+		let token = bearerToken.slice(7);
 		jwt.verify(token, process.env.JWT_SECRET, { algorithms: ["HS256"] }, (err, decoded) => {
 			if (err) {
 				console.log(
@@ -159,6 +179,7 @@ userRoutes.post("/api/count", verifyJWT, async (req, res) => {
 });
 
 userRoutes.get("/api/user", verifyJWT, async (req, res) => {
+	console.log("if this doesn't run, delete");
 	try {
 		let response = await User.findOne({ email: req.user.email });
 		if (response) {
@@ -176,4 +197,21 @@ userRoutes.get("/api/user", verifyJWT, async (req, res) => {
 	}
 });
 
+userRoutes.post("/api/code", verifyJWT, async (req, res) => {
+	try {
+		let response = await User.findOne({ email: req.user.email });
+		if (response) {
+			res.status(200);
+			res.json({
+				message: "code was found",
+				user: { code: response.secret },
+			});
+		} else {
+			res.status(298);
+			res.json({ message: "user was not found" });
+		}
+	} catch (error) {
+		console.log("an error has occurred when finding a user: " + error.name + " : " + error.message);
+	}
+});
 module.exports = userRoutes;

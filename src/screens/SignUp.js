@@ -5,26 +5,36 @@ import ModalWrapper from "../components/modalWrapper";
 import axios from "../axios";
 
 let sucessText = "User has been sucessfully created.";
-
+let mfaText = "Scan the QR code and enter the associated code below.";
 export default function SignUpScreen(props) {
 	const [username, setUsername] = useState("");
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 	const [passwordConfirm, setPasswordConfirm] = useState("");
 	const [ModalDescription, setModalDescription] = useState("");
-
+	const [QR, setQR] = useState(null);
+	const [code, setCode] = useState(0);
 	let navigate = useNavigate();
+
+	async function submitCode() {
+		let res = await axios.post("/api/code", { code: code });
+		console.log(JSON.stringify(res));
+		if (res.data.verify) {
+			props.setLoggedIn(true);
+			returnToLogin();
+			setModalDescription("");
+		}
+	}
 
 	async function login() {
 		//need to try catch this
 		let res = await axios.post("http://localhost:5000/api/login", { email, password });
-		if (res.data.token) {
+		if (res.status === 200) {
+			setModalDescription(mfaText);
+			console.log(res.data);
+			setQR(res.data.qr);
 			localStorage.setItem("token", res.data.token);
 			localStorage.setItem("user", JSON.stringify(res.data.user));
-			props.setLoggedIn(true);
-			// '../' becomes homepage route when user is logged in
-			returnToLogin();
-			setModalDescription("");
 		} else if (res.data.error) {
 			setModalDescription(res.data.message);
 		} else {
@@ -84,7 +94,20 @@ export default function SignUpScreen(props) {
 
 	return (
 		<div className="App">
-			{!ModalDescription ? null : ModalDescription === sucessText ? ( //user has been sucessfully registered
+			{!ModalDescription ? null : QR ? ( //QR code popup
+				<ModalWrapper>
+					<img src={QR} />
+					<form>
+						<div>
+							<label>
+								{ModalDescription}
+								<input type="text" value={code} onChange={(event) => setCode(event.target.value)} />
+							</label>
+						</div>
+					</form>
+					<button onClick={submitCode}>submit</button>
+				</ModalWrapper>
+			) : ModalDescription === sucessText ? ( //user has been sucessfully registered
 				<ModalWrapper setModalDescription={setModalDescription} button={true}>
 					<p>Your account has been sucessully created.</p>
 					<button onClick={login}>Continue to Home Page</button>
