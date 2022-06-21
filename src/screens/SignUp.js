@@ -4,8 +4,6 @@ import { useNavigate } from "react-router-dom";
 import ModalWrapper from "../components/modalWrapper";
 import axios from "../axios";
 
-let sucessText = "User has been sucessfully created.";
-let mfaText = "Scan the QR code and enter the associated code below.";
 export default function SignUpScreen(props) {
 	const [username, setUsername] = useState("");
 	const [email, setEmail] = useState("");
@@ -14,32 +12,38 @@ export default function SignUpScreen(props) {
 	const [ModalDescription, setModalDescription] = useState("");
 	const [QR, setQR] = useState(null);
 	const [code, setCode] = useState(0);
+	const [modal, setModal] = useState("");
 	let navigate = useNavigate();
 
-	async function submitCode() {
-		let res = await axios.post("/api/code", { code: code });
-		console.log(JSON.stringify(res));
-		if (res.data.verify) {
+	async function login() {
+		let res = await axios.post("/api/2fa_login", { email, password, code }).catch((error) => {
+			if (error.code === "ERR_NETWORK") {
+				setModalDescription(
+					"Due to some network error, we are unable to connect you to the server right now. Please ensure the server is running and that your internet connection is stable."
+				);
+				return;
+			}
+			setModal(
+				`An error has occurred while processing your 2fa login. Name: ${error.name}. Code: ${error.code}.`
+			);
+			console.log(
+				`Error when processing 2nd layer of authentication: Error Name: ${
+					error.name
+				}. Error Code: ${error.code || "N/A"}. Error Message: ${error.message}`
+			);
+		});
+		if (res.status === 200) {
 			props.setLoggedIn(true);
 			returnToLogin();
-			setModalDescription("");
-		}
-	}
-
-	async function login() {
-		//need to try catch this
-		let res = await axios.post("http://localhost:5000/api/login", { email, password });
-		if (res.status === 200) {
-			setModalDescription(mfaText);
-			console.log(res.data);
-			setQR(res.data.qr);
-			localStorage.setItem("token", res.data.token);
 			localStorage.setItem("user", JSON.stringify(res.data.user));
 		} else if (res.data.error) {
-			setModalDescription(res.data.message);
+			setModal(
+				`An error has occurred while processing your 2fa login. Name: ${res.data.errorName}. Code: ${res.data.errorCode}.`
+			);
+			console.log(res.data.message);
 		} else {
-			//may make more user friendly?
-			setModalDescription(res.data.message);
+			//api responses are user friendly enough for this
+			setModal(res.data.message);
 		}
 	}
 
@@ -51,6 +55,8 @@ export default function SignUpScreen(props) {
 		if (!email) {
 			setModalDescription("No email was provided when signing up.");
 			return;
+		} else if (!email.includes("@") || !email.includes(".")) {
+			setModalDescription("Please provide a valid email address.");
 		}
 		if (!password || !passwordConfirm) {
 			setModalDescription(
@@ -64,7 +70,7 @@ export default function SignUpScreen(props) {
 		}
 		//sign up information should be "valid" text at this point so a post is made
 		let res = await axios
-			.post("http://localhost:5000/api/signUp", {
+			.post("/api/signUp", {
 				username: username,
 				email: email,
 				password: password,
@@ -74,18 +80,29 @@ export default function SignUpScreen(props) {
 					setModalDescription(
 						"Due to some network error, we are unable to connect you to the server right now. Please ensure the server is running and that your internet connection is stable."
 					);
-				} else {
-					//so that unexpected errors are still provided in a useful way
-					setModalDescription(
-						res.data.message + " Error Code " + res.data.errorCode + ": " + res.data.errorMessage
-					);
+					return;
 				}
+				//so that unexpected errors are still provided in a useful way
+				setModalDescription(
+					`An error occurred while attempting to sign you up. Error Name: ${error.name}. Error Code: ${error.code}`
+				);
+				console.log(
+					`Error when processing 2nd layer of authentication: Error Name: ${
+						error.name
+					}. Error Code: ${error.code || "N/A"}. Error Message: ${error.message}`
+				);
 			});
 		if (ModalDescription !== "") {
 			//if an error occurs, this should run no further
 			return;
 		}
-		setModalDescription(res.data.message);
+		if (res.status === 200) {
+			//correct password has been entered at this point (new account), now we do 2nd factor
+			setQR(res.data.qr);
+			setModalDescription("enter code:  ");
+		} else {
+			setModalDescription(res.data.message);
+		}
 	}
 
 	function returnToLogin() {
@@ -95,22 +112,21 @@ export default function SignUpScreen(props) {
 	return (
 		<div className="App">
 			{!ModalDescription ? null : QR ? ( //QR code popup
-				<ModalWrapper>
-					<img src={QR} />
+				<ModalWrapper setModalDescription={setModalDescription}>
+					<h2>
+						Scan the QR code Below with a 2fa compatible app like Google Authenticator, Duo mobile,
+						etc.
+					</h2>
+					<img src={QR} alt="Scannable QR Code" />
 					<form>
 						<div>
 							<label>
 								{ModalDescription}
-								<input type="text" value={code} onChange={(event) => setCode(event.target.value)} />
+								<input type="text" onChange={(event) => setCode(event.target.value)} />
 							</label>
 						</div>
 					</form>
-					<button onClick={submitCode}>submit</button>
-				</ModalWrapper>
-			) : ModalDescription === sucessText ? ( //user has been sucessfully registered
-				<ModalWrapper setModalDescription={setModalDescription} button={true}>
-					<p>Your account has been sucessully created.</p>
-					<button onClick={login}>Continue to Home Page</button>
+					<button onClick={login}>submit</button>
 				</ModalWrapper>
 			) : (
 				//there is some modal to be rendered, but it is not sucessful
@@ -119,6 +135,11 @@ export default function SignUpScreen(props) {
 				</ModalWrapper>
 			)}
 
+			{modal ? (
+				<ModalWrapper setModalDescription={setModal}>
+					<p>{modal}</p>
+				</ModalWrapper>
+			) : null}
 			<form>
 				<header>SignUp</header>
 
