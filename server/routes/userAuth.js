@@ -7,6 +7,7 @@ const bcrypt = require("bcrypt");
 const argon2 = require("argon2");
 const { authenticator } = require("otplib");
 const QRCode = require("qrcode");
+
 require("dotenv").config();
 
 //CORS configuration to allow http requests from the listed domains
@@ -16,7 +17,7 @@ userRoutes.use((req, res, next) => {
 	res.header("Access-Control-Allow-Origin", "http://localhost:3000");
 	res.header(
 		"Access-Control-Allow-Headers",
-		"Origin, X-Requested-With, Content-Type, Accept, Authorization"
+		"Origin, X-Requested-With, Content-Type, Accept, Authorization, x-csrf-token"
 	);
 	res.header("Access-Control-Allow-Credentials", "true");
 	res.header("Access-Control-Allow-Methods", "GET,POST,DELETE");
@@ -271,14 +272,14 @@ function verifyJWT(req, res, next) {
 		jwt.verify(
 			token,
 			process.env.JWT_PUBLIC,
-			{ algorithms: ["RS256"], maxAge: "1h", issuer: "Full Stack Dev Demo Server" },
+			{ algorithms: ["HS256"], maxAge: "1h", issuer: "Full Stack Dev Demo Server" },
 			(err, decoded) => {
 				if (err) {
 					let m = `The following error occurred when trying to verify the provided token: Error Name - ${
 						err.name
 					} | Error Code - ${err.code || "N/A"} | Error Message - ${err.message}`;
 					console.log(m + ` | Error Path: verifyJWT:1`);
-					res.status(298);
+					res.status(401);
 					return res.json({
 						error: true,
 						message: m,
@@ -344,6 +345,10 @@ userRoutes.delete("/api/clear_token", verifyJWT, (req, res) => {
 	res.clearCookie("token");
 	res.status(200);
 	return res.json({ message: "token has been cleared" });
+});
+
+userRoutes.get("/api/csrf", (req, res) => {
+	res.json({ csrfToken: req.csrfToken() });
 });
 
 module.exports = userRoutes;

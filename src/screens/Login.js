@@ -38,17 +38,15 @@ export default function LoginScreen(props) {
 			props.setLoggedIn(true);
 			// '../' is the route for homepage when logged in
 			navigate("../");
+		} else if (res.data.error) {
+			//server error but it cant be jwt error
+			setFormatError(
+				`An error occurred while trying to log your account in. Name: ${res.data.errorName}. Code: ${res.data.errorCode}.`
+			);
+			console.log(res.data.message);
 		} else {
-			//server error
-			if (res.data.error) {
-				setFormatError(
-					`An error occurred while trying to log your account in. Name: ${res.data.errorName}. Code: ${res.data.errorCode}.`
-				);
-				console.log(res.data.message);
-			} else {
-				//other reason for route failing
-				setFormatError(res.data.message);
-			}
+			//other reason for route failing
+			setFormatError(res.data.message);
 		}
 	}
 

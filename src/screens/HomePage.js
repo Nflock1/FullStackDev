@@ -19,7 +19,7 @@ export default function HomePage(props) {
 			.catch((error) => {
 				if (error.code === "ERR_NETWORK") {
 					setModal(
-						"Due to some network error, we are unable to connect you to the server right now. Please ensure the server is running and that your internet connection is stable."
+						"Due to some network error, we are unable to connect you to the server right now. Please ensure the server is running and that your internet connection is stable. Refreshing the page may also help."
 					);
 					return;
 				}
@@ -34,7 +34,7 @@ export default function HomePage(props) {
 			});
 		//handle fatal errors and errors and update user data
 		if (res.data.loggedOut) {
-			console.log("logout in homepage");
+			console.log(res.data.message);
 			props.logout();
 		} else if (res.data.error) {
 			setModal(

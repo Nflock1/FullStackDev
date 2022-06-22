@@ -78,7 +78,7 @@ export default function SignUpScreen(props) {
 			.catch((error) => {
 				if (error.code === "ERR_NETWORK") {
 					setModalDescription(
-						"Due to some network error, we are unable to connect you to the server right now. Please ensure the server is running and that your internet connection is stable."
+						"Due to some network error, we are unable to connect you to the server right now. Please ensure the server is running and that your internet connection is stable. Refreshing the page may also help."
 					);
 					return;
 				}

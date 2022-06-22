@@ -1,5 +1,5 @@
 import "./App.css";
-import { React, useState } from "react";
+import { React, useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import SignUpScreen from "./screens/SignUp";
 import LoginScreen from "./screens/Login";
@@ -11,11 +11,21 @@ function App() {
 	let tmpUser = localStorage.getItem("user");
 	const [loggedIn, setLoggedIn] = useState(tmpUser ? true : false);
 	const [modal, setModal] = useState("");
+	const [logoutModal, setLogoutModal] = useState("");
 
 	function fatalErrorHelper(emptyString) {
+		localStorage.removeItem("user");
 		setLoggedIn(false);
-		setModal(emptyString);
+		setLogoutModal(emptyString);
 	}
+
+	useEffect(() => {
+		const getCsrfToken = async () => {
+			const { data } = await axios.get("/api/csrf");
+			axios.defaults.headers.common["x-csrf-token"] = data.csrfToken;
+		};
+		getCsrfToken();
+	}, []);
 
 	try {
 		JSON.parse(tmpUser);
@@ -25,18 +35,30 @@ function App() {
 	}
 
 	function logout() {
-		localStorage.removeItem("user");
-		console.log("b4 axios");
 		axios
 			.delete("/api/clear_token")
 			.then((res) => {
 				//this route will only save a JWT error to the response. Any other errors will be thrown.
 				if (res.data.error) {
 					if (res.data.errorName === "JsonWebTokenError") {
-						setModal(
+						//bad JWT
+						setLogoutModal(
 							`A Fatal JWT Error has occurred. You have been logged out. Name: ${res.data.errorName}. Code: ${res.data.errorCode}. `
 						);
+					} else if (res.data.errorName === "TokenExpiredError") {
+						setLogoutModal(`Your session has expired. You have been logged out.`);
+					} else {
+						//some other error
+						setLogoutModal(
+							`An error occurred while attempting to log you out. Error Name: ${
+								res.data.errorName
+							}. Error Code: ${res.data.errorCode || "N/A"}. Error Message: ${
+								res.data.errorMessage
+							}`
+						);
 					}
+				} else {
+					setLogoutModal(`You have been logged out.`);
 				}
 			})
 			.catch((error) => {
@@ -62,8 +84,13 @@ function App() {
 						path="/"
 						element={
 							<>
-								{modal ? (
+								{logoutModal ? (
 									<ModalWrapper setModalDescription={fatalErrorHelper}>
+										<p>{logoutModal}</p>
+									</ModalWrapper>
+								) : null}
+								{modal ? (
+									<ModalWrapper setModalDescription={setModal}>
 										<p>{modal}</p>
 									</ModalWrapper>
 								) : null}
