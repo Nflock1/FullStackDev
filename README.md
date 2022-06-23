@@ -49,7 +49,7 @@ This is done in react state in this program.
 NOTE ON STATUS CODES: status codes used here stay within the 200's or else Axios comandeers the response object and creates it's own error messages.
 to avoid unexpected response structures and to provide clarity in errors, a custom system of coding is used where:
 
-used here <-> standard
-298 <-> 400
-299 <-> 401
+used here <-> standard  
+298 <-> 400  
+299 <-> 401  
 200 <-> 200
