@@ -80,7 +80,6 @@ userRoutes.post("/api/signUp", async (req, res) => {
 				//user may already have an account created without 2fa
 				let response = await User.findOne({ username: username });
 				if (response.email === email) {
-					console.log(JSON.stringify(error));
 					res.status(298);
 					res.json({
 						error: true,
