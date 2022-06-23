@@ -4,7 +4,6 @@ const userRoutes = express.Router();
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
-const argon2 = require("argon2");
 const { authenticator } = require("otplib");
 const QRCode = require("qrcode");
 
@@ -17,7 +16,7 @@ userRoutes.use((req, res, next) => {
 	res.header("Access-Control-Allow-Origin", "http://localhost:3000");
 	res.header(
 		"Access-Control-Allow-Headers",
-		"Origin, X-Requested-With, Content-Type, Accept, Authorization, x-csrf-token"
+		"Origin, X-Requested-With, Content-Type, Accept, x-csrf-token"
 	);
 	res.header("Access-Control-Allow-Credentials", "true");
 	res.header("Access-Control-Allow-Methods", "GET,POST,DELETE");
@@ -78,13 +77,26 @@ userRoutes.post("/api/signUp", async (req, res) => {
 		//need to handle more broadly
 		if (error.code === 11000) {
 			if (error.message.includes("username")) {
-				res.status(298);
-				res.json({
-					error: true,
-					message: "The provided username is already in use.",
-					errorName: error.name,
-					errorCode: error.code || "N/A",
-				});
+				//user may already have an account created without 2fa
+				let response = await User.findOne({ username: username });
+				if (response.email === email) {
+					console.log(JSON.stringify(error));
+					res.status(298);
+					res.json({
+						error: true,
+						message: "The provided credentials are already in use.",
+						errorName: "Duplicate Account",
+						errorCode: error.code || "N/A",
+					});
+				} else {
+					res.status(298);
+					res.json({
+						error: true,
+						message: "The provided username is already in use.",
+						errorName: error.name,
+						errorCode: error.code || "N/A",
+					});
+				}
 			} else {
 				res.status(298);
 				res.json({
@@ -272,14 +284,14 @@ function verifyJWT(req, res, next) {
 		jwt.verify(
 			token,
 			process.env.JWT_PUBLIC,
-			{ algorithms: ["HS256"], maxAge: "1h", issuer: "Full Stack Dev Demo Server" },
+			{ algorithms: ["RS256"], maxAge: "1h", issuer: "Full Stack Dev Demo Server" },
 			(err, decoded) => {
 				if (err) {
 					let m = `The following error occurred when trying to verify the provided token: Error Name - ${
 						err.name
 					} | Error Code - ${err.code || "N/A"} | Error Message - ${err.message}`;
 					console.log(m + ` | Error Path: verifyJWT:1`);
-					res.status(401);
+					res.status(299);
 					return res.json({
 						error: true,
 						message: m,
@@ -298,7 +310,15 @@ function verifyJWT(req, res, next) {
 		);
 	} else {
 		res.status(299);
-		return res.json({ message: "No access token was given", loggedOut: true });
+		let m = `The following error occurred when trying to verify the provided token: Error Name - No Token (JWT) | Error Code - NOTOKEN | Error Message - N/A`;
+		console.log(m + ` | Error Path: verifyJWT:1`);
+		return res.json({
+			error: true,
+			errorName: "No Token (JWT)",
+			errorCode: "NOTOKEN",
+			message: m,
+			loggedOut: true,
+		});
 	}
 }
 
@@ -342,11 +362,33 @@ userRoutes.post("/api/count", verifyJWT, async (req, res) => {
  * required fields for req.body: none
  */
 userRoutes.delete("/api/clear_token", verifyJWT, (req, res) => {
-	res.clearCookie("token");
-	res.status(200);
-	return res.json({ message: "token has been cleared" });
+	try {
+		res.clearCookie("token");
+		res.status(200);
+		return res.json({ message: "token has been cleared" });
+	} catch (error) {
+		let m = `The following error occurred when trying to clear the JWT of (${
+			req.user.email
+		})'s client: Error Name - ${error.name} | Error Code - ${
+			error.code || "N/A"
+		} | Error Message - ${error.message}`;
+		console.log(m + ` | Error Path: /api/clear_token:1`);
+		res.status(298);
+		res.json({
+			error: true,
+			message: m,
+			errorName: error.name,
+			errorCode: error.code || "N/A",
+		});
+	}
 });
 
+/*
+ * This route creates and returns the CSRF token which is used for request authentication
+ * by the client in tandem with a JWT cookie
+ *
+ * required fields for req.body: none
+ */
 userRoutes.get("/api/csrf", (req, res) => {
 	res.json({ csrfToken: req.csrfToken() });
 });

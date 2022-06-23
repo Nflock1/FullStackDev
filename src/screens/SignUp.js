@@ -19,7 +19,7 @@ export default function SignUpScreen(props) {
 		let res = await axios.post("/api/2fa_login", { email, password, code }).catch((error) => {
 			if (error.code === "ERR_NETWORK") {
 				setModalDescription(
-					"Due to some network error, we are unable to connect you to the server right now. Please ensure the server is running and that your internet connection is stable."
+					"Due to some network error, we are unable to connect you to the server right now. Please ensure the server is running and that your internet connection is stable. Refreshing the page may also help."
 				);
 				return;
 			}
@@ -101,7 +101,12 @@ export default function SignUpScreen(props) {
 			setQR(res.data.qr);
 			setModalDescription("enter code:  ");
 		} else {
-			setModalDescription(res.data.message);
+			let condText = "";
+			if (res.data.errorName === "Duplicate Account") {
+				condText =
+					" Please login to the account associated with the email you provided or select a new username and email.";
+			}
+			setModal(res.data.message + condText);
 		}
 	}
 
@@ -113,10 +118,11 @@ export default function SignUpScreen(props) {
 		<div className="App">
 			{!ModalDescription ? null : QR ? ( //QR code popup
 				<ModalWrapper setModalDescription={setModalDescription}>
-					<h2>
-						Scan the QR code Below with a 2fa compatible app like Google Authenticator, Duo mobile,
-						etc.
-					</h2>
+					<h3>
+						Your account has been sucessfully created. To finish logging in, you must setup 2fa by
+						scanning the QR code below with a 2fa compatible app like Google Authenticator, Duo
+						mobile, etc.
+					</h3>
 					<img src={QR} alt="Scannable QR Code" />
 					<form>
 						<div>

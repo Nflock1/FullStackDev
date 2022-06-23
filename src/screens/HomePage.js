@@ -13,40 +13,39 @@ export default function HomePage(props) {
 	});
 
 	async function incCount() {
-		const token = localStorage.getItem("token");
-		let res = await axios
-			.post("/api/count", {}, { headers: { Authorization: token } })
-			.catch((error) => {
-				if (error.code === "ERR_NETWORK") {
-					setModal(
-						"Due to some network error, we are unable to connect you to the server right now. Please ensure the server is running and that your internet connection is stable. Refreshing the page may also help."
-					);
-					return;
-				}
+		let res = await axios.post("/api/count", {}).catch((error) => {
+			if (error.code === "ERR_NETWORK") {
 				setModal(
-					`An error has occurred while incrementing your count. Name: ${error.name}. Code: ${error.code}.`
+					"Due to some network error, we are unable to connect you to the server right now. Please ensure the server is running and that your internet connection is stable. Refreshing the page may also help."
 				);
-				console.log(
-					`Error when incrementing the user's count: Error Name: ${error.name}. Error Code: ${
-						error.code || "N/A"
-					}. Error Message: ${error.message}`
-				);
-			});
-		//handle fatal errors and errors and update user data
-		if (res.data.loggedOut) {
-			console.log(res.data.message);
-			props.logout();
-		} else if (res.data.error) {
+				return;
+			}
 			setModal(
-				`An error occurred while trying to increment your count. Name: ${res.data.errorName}. Code: ${res.data.errorCode}.`
+				`An error has occurred while incrementing your count. Name: ${error.name}. Code: ${error.code}.`
 			);
-			console.log(res.data.message);
-		} else {
-			setCount(res.data.count);
-			setUser((user) => {
-				user.count = res.data.count;
-				return user;
-			});
+			console.log(
+				`Error when incrementing the user's count: Error Name: ${error.name}. Error Code: ${
+					error.code || "N/A"
+				}. Error Message: ${error.message}`
+			);
+		});
+		//handle fatal errors and errors and update user data
+		if (res) {
+			if (res.data.loggedOut) {
+				console.log(res.data.message);
+				props.logout();
+			} else if (res.data.error) {
+				setModal(
+					`An error occurred while trying to increment your count. Name: ${res.data.errorName}. Code: ${res.data.errorCode}.`
+				);
+				console.log(res.data.message);
+			} else {
+				setCount(res.data.count);
+				setUser((user) => {
+					user.count = res.data.count;
+					return user;
+				});
+			}
 		}
 	}
 

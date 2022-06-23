@@ -13,17 +13,19 @@ function createServer() {
 	app.use(csrfProtection);
 	app.use(express.json());
 	app.use((err, req, res, next) => {
+		console.log("test{");
+
 		if (err.code !== "EBADCSRFTOKEN") {
 			return next(err);
 		} else {
-			res.status(297);
-			console.log(JSON.stringify(err));
+			res.status(403);
 			console.log(`invalid CSRF token provided.`);
 			return res.json({
 				error: true,
 				message: `A CSURF error has occurred. ${err.message}`,
 				errorName: err.name,
 				errorCode: err.code,
+				loggedOut: true,
 			});
 		}
 	});
